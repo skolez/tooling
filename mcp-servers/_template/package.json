@@ -1,0 +1,29 @@
+{
+  "name": "mcp-server-template",
+  "version": "0.1.0",
+  "description": "Starter template for a custom MCP server. Copy and rename for each new API wrapper.",
+  "type": "module",
+  "bin": {
+    "mcp-server-template": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.5.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

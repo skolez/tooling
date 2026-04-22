@@ -7,13 +7,16 @@ don't already have one available.
 ## Layout
 
 - `tools/crawlers/` — web crawling / scraping utilities
-- `tools/images/` — image gathering, filtering, and categorization
+- `tools/images/` — [`image-tool`](tools/images/README.md): fetch + categorize images (metadata + optional CLIP semantic tagging)
+- `tools/content/` — [`content-tool`](tools/content/README.md): ingest + categorize text / HTML / PDF
 - `tools/apis/` — helpers and clients for working with external APIs
-- `mcp-servers/` — custom MCP servers for APIs without existing ones
+- `mcp-servers/` — custom MCP servers; [`_template/`](mcp-servers/_template/README.md) is a starter to copy
 - `shared/` — utilities shared across tools (config, logging, http clients, etc.)
 
 Each tool or server lives in its own subdirectory with its own README and
 dependency manifest so they can be developed and versioned independently.
+A root `Makefile` delegates to each subproject's build system — run
+`make help` for the full list of targets.
 
 ## Conventions
 
