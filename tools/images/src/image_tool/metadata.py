@@ -23,6 +23,7 @@ class ImageMetadata:
     dominant_color: tuple[int, int, int] | None
     phash: str
     error: str | None = None
+    semantic_tags: list[dict] | None = None
 
     def to_dict(self) -> dict:
         return asdict(self)

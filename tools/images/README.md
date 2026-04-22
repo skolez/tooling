@@ -115,11 +115,47 @@ records = categorize_dir(Path("./downloads"))
 write_manifest(records, Path("./manifest.json"))
 ```
 
+## Semantic tagging (optional, CLIP-based)
+
+Opt-in via the `[semantic]` extras — pulls in `torch` + `open_clip_torch`,
+so it's gated behind an explicit install:
+
+```bash
+cd tools/images
+uv sync --extra semantic            # or: pip install '.[semantic]'
+```
+
+Then pass `--semantic` to any command that produces a manifest:
+
+```bash
+image-tool categorize ./downloads --semantic --out manifest.json
+image-tool categorize ./downloads --semantic --labels my_labels.txt --top-k 5
+```
+
+Each image gets a `semantic_tags: [{label, score}, ...]` list on its record
+(top-K by cosine similarity) plus a `categories.semantic` field set to the
+top label. Labels file format: one candidate caption per line, `#`
+comments allowed, e.g.
+
+```
+a photograph
+a product photo on a white background
+a screenshot
+a piece of text or document
+...
+```
+
+The built-in default label set covers common image types (photograph,
+illustration, screenshot, portrait, landscape, product photo, etc.) — see
+`src/image_tool/semantic.py`.
+
+First run downloads the CLIP weights (~350MB for ViT-B-32/openai) into the
+open_clip cache. Swap models with `--model` / `--pretrained` (any open_clip
+combo works, e.g. `--model ViT-L-14 --pretrained openai`).
+
 ## Roadmap
 
-- Semantic categorization via CLIP / a vision model (opt-in, separate command
-  so we don't pull heavy deps by default).
 - Near-duplicate grouping based on pHash Hamming distance.
 - Robots.txt + polite rate limiting for page scraping.
-- Unify with a general "content categorizer" once its shape is clearer —
-  likely sharing the same bucketing/manifest infrastructure.
+- Share bucketing/manifest infrastructure with the content categorizer
+  under `tools/content/`.

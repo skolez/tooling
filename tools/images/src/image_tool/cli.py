@@ -74,9 +74,20 @@ def categorize(
     out: Path = typer.Option(Path("./manifest.json"), "--out", "-o"),
     workers: int = typer.Option(8, "--workers", "-w"),
     quiet: bool = typer.Option(False, "--quiet", "-q"),
+    semantic: bool = typer.Option(
+        False, "--semantic",
+        help="Enable CLIP-based semantic tagging. Requires the [semantic] extras.",
+    ),
+    labels_file: Path = typer.Option(
+        None, "--labels", help="Text file with candidate labels, one per line."
+    ),
+    top_k: int = typer.Option(3, "--top-k", help="Tags to keep per image when --semantic."),
+    model: str = typer.Option("ViT-B-32", "--model", help="open_clip model name."),
+    pretrained: str = typer.Option("openai", "--pretrained"),
 ) -> None:
     """Scan a directory (or single file) and emit a categorized manifest."""
-    records = categorize_dir(path, workers=workers)
+    tagger = _build_tagger(semantic, labels_file, top_k, model, pretrained)
+    records = categorize_dir(path, workers=workers, semantic_tagger=tagger)
     if not records:
         console.print("[yellow]No images found.[/yellow]")
         raise typer.Exit(code=1)
@@ -84,6 +95,28 @@ def categorize(
     if not quiet:
         _print_summary(summarize(records))
     console.print(f"manifest: {out}")
+
+
+def _build_tagger(
+    semantic: bool,
+    labels_file: Path | None,
+    top_k: int,
+    model: str,
+    pretrained: str,
+):
+    if not semantic:
+        return None
+    from .semantic import SemanticTagger, load_labels_file
+
+    labels = load_labels_file(labels_file) if labels_file else None
+    console.print(f"[cyan]loading CLIP model {model}/{pretrained}…[/cyan]")
+    base = SemanticTagger.load(labels=labels, model_name=model, pretrained=pretrained)
+
+    class _WithTopK:
+        def tag_paths(self, paths):
+            return base.tag_paths(paths, top_k=top_k)
+
+    return _WithTopK()
 
 
 @app.command()
@@ -95,6 +128,11 @@ def process(
     manifest: Path = typer.Option(Path("./manifest.json"), "--manifest", "-m"),
     workers: int = typer.Option(8, "--workers", "-w"),
     timeout: float = typer.Option(30.0, "--timeout"),
+    semantic: bool = typer.Option(False, "--semantic"),
+    labels_file: Path = typer.Option(None, "--labels"),
+    top_k: int = typer.Option(3, "--top-k"),
+    model: str = typer.Option("ViT-B-32", "--model"),
+    pretrained: str = typer.Option("openai", "--pretrained"),
 ) -> None:
     """Fetch then categorize in a single run."""
     if page:
@@ -106,7 +144,8 @@ def process(
             raise typer.Exit(code=2)
         fetch_urls(url_list, out, workers=workers, timeout=timeout)
 
-    records = categorize_dir(out, workers=workers)
+    tagger = _build_tagger(semantic, labels_file, top_k, model, pretrained)
+    records = categorize_dir(out, workers=workers, semantic_tagger=tagger)
     write_manifest(records, manifest)
     _print_summary(summarize(records))
     console.print(f"manifest: {manifest}")

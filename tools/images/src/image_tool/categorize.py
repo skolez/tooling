@@ -17,6 +17,9 @@ from .metadata import ImageMetadata, extract
 
 Categorizer = Callable[[ImageMetadata], str]
 
+SemanticTaggerLike = Callable[[list[Path]], dict[str, list]]
+"""Anything with a `tag_paths` method — see semantic.SemanticTagger."""
+
 IMAGE_EXTENSIONS = {
     ".jpg", ".jpeg", ".png", ".gif", ".webp",
     ".bmp", ".tiff", ".tif", ".avif", ".heic",
@@ -51,6 +54,13 @@ def size_bucket(m: ImageMetadata) -> str:
     if pixels < 8_000_000:
         return "large"          # < ~2828x2828
     return "xlarge"
+
+
+def semantic_bucket(m: ImageMetadata) -> str:
+    tags = m.semantic_tags or []
+    if not tags:
+        return "unknown"
+    return tags[0].get("label", "unknown")
 
 
 def color_bucket(m: ImageMetadata) -> str:
@@ -111,13 +121,41 @@ def categorize_dir(
     root: Path,
     categorizers: dict[str, Categorizer] | None = None,
     workers: int = 8,
+    semantic_tagger: SemanticTaggerLike | None = None,
 ) -> list[dict]:
+    """Scan a dir (or file) and return categorized records.
+
+    If `semantic_tagger` is provided, it runs as a batched pre-pass and its
+    output is stitched into each record before bucketing — so a "semantic"
+    categorizer can read them.
+    """
     paths = list(iter_image_paths(root))
     results: list[dict] = []
     if not paths:
         return results
+
+    semantic_by_path: dict[str, list[dict]] = {}
+    if semantic_tagger is not None:
+        raw = semantic_tagger.tag_paths(paths)  # type: ignore[attr-defined]
+        for key, tags in raw.items():
+            semantic_by_path[key] = [
+                t.to_dict() if hasattr(t, "to_dict") else t for t in tags
+            ]
+
+    cats = categorizers or DEFAULT_CATEGORIZERS
+    if semantic_by_path and "semantic" not in cats:
+        cats = {**cats, "semantic": semantic_bucket}
+
+    def _work(p: Path) -> dict:
+        meta = extract(p)
+        if semantic_by_path:
+            meta.semantic_tags = semantic_by_path.get(str(p), [])
+        record = meta.to_dict()
+        record["categories"] = {name: fn(meta) for name, fn in cats.items()}
+        return record
+
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        futures = {pool.submit(categorize_one, p, categorizers): p for p in paths}
+        futures = {pool.submit(_work, p): p for p in paths}
         for fut in as_completed(futures):
             results.append(fut.result())
     results.sort(key=lambda r: r["path"])
