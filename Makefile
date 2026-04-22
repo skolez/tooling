@@ -16,7 +16,7 @@
 # with either a pyproject.toml (Python) or a package.json (Node), then add
 # its name to PY_SUBPROJECTS or TS_SUBPROJECTS below.
 
-PY_SUBPROJECTS := images
+PY_SUBPROJECTS := images content
 TS_SUBPROJECTS :=
 MCP_SUBPROJECTS :=
 
